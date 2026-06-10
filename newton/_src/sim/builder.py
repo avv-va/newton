@@ -7397,6 +7397,7 @@ class ModelBuilder:
         """
         self.particle_q.append(pos)
         self.particle_qd.append(vel)
+        # print(f"mass: {mass:.2f}")
         self.particle_mass.append(mass)
         if radius is None:
             radius = self.default_particle_radius
@@ -8372,6 +8373,11 @@ class ModelBuilder:
 
         centers = pts_in.tolist()
         radii = [float(radius)] * len(centers)
+        # print(f"radii: {radii}")
+        # print(f"centers: {centers}")
+
+        #print(f"total_volume: {total_volume:.2f}")
+
         volume_dict = {"centers": centers, "radii": radii}
         return self.add_particle_volume(volume_dict, total_mass=total_mass, pos=pos, rot=rot)
 
@@ -8449,6 +8455,11 @@ class ModelBuilder:
         volumes = (4.0 / 3.0) * np.pi * (radii ** 3)
         total_volume = np.sum(volumes)
 
+        # print(f"volumes: ${volumes}")
+        # print(f"radii: ${radii}")
+        # print(f"total_volume: ${total_volume}")
+        # print(f"total_mass: ${total_mass}")
+
         if total_volume <= 0:
             raise ValueError(f"Total volume of all spheres cannot be 0")
 
@@ -8480,7 +8491,11 @@ class ModelBuilder:
             # Calculate the mass of this particle based on its volume relative
             # to the total volume
             particle_volume = 4.0 / 3.0 * np.pi * (radius ** 3)
+
             mass = total_mass * (particle_volume / total_volume)
+
+            # print(f"particle_volume: {particle_volume:.20f}")
+            # print(f"mass: {mass:.20f}")           
 
             # Convert to wp.vec3
             point_vec = wp.vec3(*point)
@@ -8495,12 +8510,18 @@ class ModelBuilder:
             self.particle_group[-1] = group_id
         
         particle_end_idx = len(self.particle_q)
+        # print(f"number of particles: {particle_end_idx:.2f}")
         
         # Store reverse mapping
         self.particle_groups[group_id] = list(range(particle_start_idx, particle_end_idx))
 
         return group_id
 
+
+        
+
+
+    
     def add_soft_grid(
         self,
         pos: Vec3,

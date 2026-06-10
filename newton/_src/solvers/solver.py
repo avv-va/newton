@@ -33,10 +33,18 @@ def integrate_particles(
 
     inv_mass = w[tid]
     world_idx = particle_world[tid]
-    world_g = gravity[wp.max(world_idx, 0)]
+    world_g = -1.00 * gravity[2] #here
 
     # simple semi-implicit Euler. v1 = v0 + a dt, x1 = x0 + v1 dt
     v1 = v0 + (f0 * inv_mass + world_g * wp.step(-inv_mass)) * dt
+
+    wp.printf("world_idx: %f", world_idx)
+    # wp.printf("v1: %f", v1)
+    # wp.printf("f0: %f", f0)
+   
+
+
+
     # enforce velocity limit to prevent instability
     v1_mag = wp.length(v1)
     if v1_mag > v_max:
@@ -279,6 +287,10 @@ class SolverBase:
             state_out (State): The output state.
             dt (float): The time step (typically in seconds).
         """
+        # print(f"gravity: {model.gravity}")
+        # print(f"state_in.particle_f: {state_in.particle_f}")
+        # print(f"model.particle_max_velocity: {model.particle_max_velocity}")
+
         if model.particle_count:
             wp.launch(
                 kernel=integrate_particles,

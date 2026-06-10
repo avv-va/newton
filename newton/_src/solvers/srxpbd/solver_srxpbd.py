@@ -67,8 +67,7 @@ class SolverSRXPBD(SolverBase):
                 self._group_has_mass_cache = []
                 for group_id in range(model.particle_group_count):
                     group_particle_indices = model.particle_groups[group_id]
-                    group_masses = model.particle_mass.numpy(
-                    )[group_particle_indices.numpy()]
+                    group_masses = model.particle_mass.numpy()[group_particle_indices.numpy()]
                     has_mass = bool(np.any(group_masses > 0.0))
                     self._group_has_mass_cache.append(has_mass)
 
