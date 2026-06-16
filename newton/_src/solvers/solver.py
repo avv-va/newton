@@ -36,14 +36,7 @@ def integrate_particles(
     world_g = -1.00 * gravity[2] #here
 
     # simple semi-implicit Euler. v1 = v0 + a dt, x1 = x0 + v1 dt
-    v1 = v0 + (f0 * inv_mass + world_g * wp.step(-inv_mass)) * dt
-
-    wp.printf("world_idx: %f", world_idx)
-    # wp.printf("v1: %f", v1)
-    # wp.printf("f0: %f", f0)
-   
-
-
+    v1 = v0 + (f0 * inv_mass + world_g * wp.step(-inv_mass)) * dt   
 
     # enforce velocity limit to prevent instability
     v1_mag = wp.length(v1)
