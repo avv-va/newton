@@ -11,6 +11,7 @@ from .solver import SolverBase
 from .style3d.solver_style3d import SolverStyle3D
 from .vbd import SolverVBD
 from .xpbd import SolverXPBD
+from .srxpbd import SolverSRXPBD
 
 __all__ = [
     "SolverBase",
@@ -22,5 +23,6 @@ __all__ = [
     "SolverSemiImplicit",
     "SolverStyle3D",
     "SolverVBD",
+    "SolverSRXPBD",
     "SolverXPBD",
 ]

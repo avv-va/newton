@@ -695,6 +695,12 @@ class Model:
         self.constraint_mimic_world: wp.array[wp.int32] | None = None
         """World index for each constraint, shape [constraint_mimic_count], int."""
 
+        self.particle_group = None
+        """Maps each particle to its group ID using particle index (-1 for ungrouped particles) e.g. particle_group[0] returns the group id of particle 0"""
+        self.particle_groups = {}
+        """Maps group_id -> list of particle indices"""
+        self.particle_group_count = 0
+
         self.particle_count: int = 0
         """Total number of particles in the system."""
         self.body_count: int = 0

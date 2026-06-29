@@ -410,6 +410,7 @@ from ._src.solvers import (
     SolverStyle3D,
     SolverVBD,
     SolverXPBD,
+    SolverSRXPBD,
     style3d,
 )
 
@@ -425,6 +426,7 @@ __all__ = [
     "SolverNotifyFlags",
     "SolverSemiImplicit",
     "SolverStyle3D",
+    "SolverSRXPBD",
     "SolverVBD",
     "SolverXPBD",
     "style3d",
