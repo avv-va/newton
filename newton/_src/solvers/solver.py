@@ -50,6 +50,9 @@ def integrate_particles(
     world_idx = particle_world[tid]
     world_g = gravity[world_idx]
 
+    if (particle_flags[tid] & ParticleFlags.INTEGRATE_ONLY) != 0:
+        world_g = wp.vec3(0.0)
+
     # simple semi-implicit Euler. v1 = v0 + a dt, x1 = x0 + v1 dt
     v1 = v0 + (f0 * inv_mass + world_g * wp.step(-inv_mass)) * dt
     # enforce velocity limit to prevent instability

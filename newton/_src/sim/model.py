@@ -263,6 +263,7 @@ class Model:
         "particle_radius": AttributeSpec(AttributeFrequency.PARTICLE),
         "particle_flags": AttributeSpec(AttributeFrequency.PARTICLE),
         "particle_world": AttributeSpec(AttributeFrequency.PARTICLE, references=AttributeFrequency.WORLD),
+        "particle_group": AttributeSpec(AttributeFrequency.PARTICLE),
         "particle_colors": AttributeSpec(AttributeFrequency.PARTICLE),
         "particle_world_start": AttributeSpec(
             AttributeFrequency.PARTICLE,
@@ -620,6 +621,15 @@ class Model:
         """Maximum particle velocity [m/s] (to prevent instability)."""
         self.particle_world: wp.array[wp.int32] | None = None
         """World index for each particle, shape [particle_count], int. -1 for global."""
+        self.particle_group: wp.array[wp.int32] | None = None
+        """Group id for each particle, shape [particle_count], int. -1 for ungrouped.
+
+        Populated by :meth:`~newton.ModelBuilder.add_particle_volume`. Solvers such as
+        :class:`~newton.solvers.SolverSRXPBD` and :class:`~newton.solvers.SolverBXPBD` treat
+        each group as a single rigid body.
+        """
+        self.particle_group_count: int = 0
+        """Total number of particle groups."""
         self.particle_world_start: wp.array[wp.int32] | None = None
         """Start index of the first particle per world, shape [world_count + 2], int.
 

@@ -34,11 +34,13 @@ https://newton-physics.github.io/newton/stable/solvers/index.html.
    :toctree: _generated
    :nosignatures:
 
+   SolverBXPBD
    SolverBase
    SolverFeatherstone
    SolverImplicitMPM
    SolverKamino
    SolverMuJoCo
+   SolverSRXPBD
    SolverSemiImplicit
    SolverStyle3D
    SolverVBD

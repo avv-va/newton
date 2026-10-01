@@ -6,22 +6,26 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from . import style3d
+    from .bxpbd import SolverBXPBD
     from .featherstone import SolverFeatherstone
     from .implicit_mpm import SolverImplicitMPM
     from .kamino import SolverKamino
     from .mujoco import SolverMuJoCo
     from .semi_implicit import SolverSemiImplicit
     from .solver import SolverBase
+    from .srxpbd import SolverSRXPBD
     from .style3d.solver_style3d import SolverStyle3D
     from .vbd import SolverVBD
     from .xpbd import SolverXPBD
 
 __all__ = [
+    "SolverBXPBD",
     "SolverBase",
     "SolverFeatherstone",
     "SolverImplicitMPM",
     "SolverKamino",
     "SolverMuJoCo",
+    "SolverSRXPBD",
     "SolverSemiImplicit",
     "SolverStyle3D",
     "SolverVBD",
@@ -34,11 +38,13 @@ __all__ = [
 # resolved on first attribute access (PEP 562) so that importing Newton does
 # not pay the import cost of every solver backend.
 _LAZY_IMPORTS: dict[str, tuple[str, str | None]] = {
+    "SolverBXPBD": (".bxpbd", "SolverBXPBD"),
     "SolverBase": (".solver", "SolverBase"),
     "SolverFeatherstone": (".featherstone", "SolverFeatherstone"),
     "SolverImplicitMPM": (".implicit_mpm", "SolverImplicitMPM"),
     "SolverKamino": (".kamino", "SolverKamino"),
     "SolverMuJoCo": (".mujoco", "SolverMuJoCo"),
+    "SolverSRXPBD": (".srxpbd", "SolverSRXPBD"),
     "SolverSemiImplicit": (".semi_implicit", "SolverSemiImplicit"),
     "SolverStyle3D": (".style3d.solver_style3d", "SolverStyle3D"),
     "SolverVBD": (".vbd", "SolverVBD"),

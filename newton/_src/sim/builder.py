@@ -10,6 +10,7 @@ import ctypes
 import functools
 import gc
 import inspect
+import json
 import math
 import os
 import warnings
@@ -1609,6 +1610,12 @@ class ModelBuilder:
         """Particle color groups accumulated for :attr:`Model.particle_color_groups`."""
         self.particle_world: list[int] = []
         """World indices accumulated for :attr:`Model.particle_world`."""
+        self.particle_group: list[int] = []
+        """Group id for each particle (``-1`` for ungrouped), accumulated for :attr:`Model.particle_group`."""
+        self.particle_groups: dict[int, list[int]] = {}
+        """Maps group id to the list of particle indices in that group."""
+        self.particle_group_count: int = 0
+        """Number of particle groups accumulated for :attr:`Model.particle_group_count`."""
 
         # shapes (each shape has an entry in these arrays)
         self.shape_label: list[str] = []
@@ -3397,6 +3404,26 @@ class ModelBuilder:
                 self.particle_q[array_starts["particle_q"] :] = particle_q
             else:
                 self.particle_q.extend(particle_q.tolist())
+
+        attribute_specs.pop("particle_group")
+        if counts["particle"]:
+            # particle_group ids are local to a builder, so each world copy needs its own
+            # offset to keep groups from different copies distinct; this can't be expressed
+            # as a simple domain reference like particle_world, so it's merged by hand.
+            particle_starts = starts("particle")
+            group_offset_base = self.particle_group_count
+            source_groups = np.asarray(builder.particle_group, dtype=np.int64)
+            for world_index in range(world_count):
+                group_offset = group_offset_base + world_index * builder.particle_group_count
+                particle_start = int(particle_starts[world_index])
+                self.particle_group.extend(
+                    np.where(source_groups >= 0, source_groups + group_offset, source_groups).tolist()
+                )
+                for group_id, particle_indices in builder.particle_groups.items():
+                    self.particle_groups[group_id + group_offset] = [
+                        index + particle_start for index in particle_indices
+                    ]
+            self.particle_group_count += world_count * builder.particle_group_count
 
         shape_starts = starts("shape")
         body_starts = starts("body")
@@ -9897,6 +9924,7 @@ class ModelBuilder:
         self.particle_radius.append(radius)
         self.particle_flags.append(flags)
         self.particle_world.append(self.current_world)
+        self.particle_group.append(-1)
 
         particle_id = self.particle_count - 1
 
@@ -9969,6 +9997,7 @@ class ModelBuilder:
         self.particle_flags.extend(flags)
         # Maintain world assignment for bulk particle creation
         self.particle_world.extend([self.current_world] * particle_count)
+        self.particle_group.extend([-1] * particle_count)
 
         # Process custom attributes
         if custom_attributes and particle_count:
@@ -10846,6 +10875,150 @@ class ModelBuilder:
             (start_tri, end_tri),
             (edge_range.start, edge_range.stop),
         )
+
+    def manual_sphere_packing(
+        self,
+        mesh_file: str,
+        radius: float,
+        spacing: float,
+        total_mass: float,
+        pos: Vec3 | None = None,
+        rot: Quat | None = None,
+    ) -> int:
+        """Packs a triangle mesh with spheres and adds them via :meth:`add_particle_volume`.
+
+        Samples a regular grid of candidate points inside the mesh's bounding box with
+        spacing ``spacing``, keeps only the points that lie inside the mesh, and treats each
+        surviving point as the center of a sphere of radius ``radius``. Requires the optional
+        ``trimesh`` package.
+
+        Args:
+            mesh_file: Path to a mesh file loadable by ``trimesh``, or a ``trimesh.Trimesh``.
+            radius: Radius of every packed sphere [m].
+            spacing: Grid spacing between candidate sphere centers [m]. ``2 * radius`` packs
+                spheres with no overlap.
+            total_mass: Total mass of the packed volume [kg], distributed as in
+                :meth:`add_particle_volume`.
+            pos: World-space offset applied to the packing. Defaults to ``(0, 0, 0)``.
+            rot: Rotation applied to the packing. Defaults to the identity rotation.
+
+        Returns:
+            The group id assigned to this volume's particles, as returned by
+            :meth:`add_particle_volume`.
+
+        Raises:
+            ValueError: If the mesh is empty or no sphere centers land inside it.
+        """
+        import trimesh
+
+        # trimesh.contains() reads the legacy global RNG state internally, so a
+        # np.random.Generator instance would not make it reproducible.
+        np.random.seed(10)  # noqa: NPY002
+        mesh = trimesh.load(mesh_file, force="mesh")
+        if mesh.is_empty:
+            raise ValueError(f"Failed to load mesh from file: {mesh_file}")
+
+        bounds = mesh.bounds
+        mins = np.array(bounds[0], dtype=float) - float(radius)
+        maxs = np.array(bounds[1], dtype=float) + float(radius)
+
+        nx = int(np.ceil((maxs[0] - mins[0]) / spacing)) + 1
+        ny = int(np.ceil((maxs[1] - mins[1]) / spacing)) + 1
+        nz = int(np.ceil((maxs[2] - mins[2]) / spacing)) + 1
+        if nx == 0 or ny == 0 or nz == 0:
+            raise ValueError(
+                f"Invalid grid dimensions ({nx}, {ny}, {nz}) for mesh {mesh_file} "
+                f"with radius {radius} and spacing {spacing}"
+            )
+
+        xs = np.linspace(mins[0], mins[0] + (nx - 1) * spacing, nx, dtype=float)
+        ys = np.linspace(mins[1], mins[1] + (ny - 1) * spacing, ny, dtype=float)
+        zs = np.linspace(mins[2], mins[2] + (nz - 1) * spacing, nz, dtype=float)
+
+        x, y, z = np.meshgrid(xs, ys, zs, indexing="xy")
+        candidates = np.vstack((x.ravel(), y.ravel(), z.ravel())).T
+
+        # mesh.contains is not deterministic
+        inside = mesh.contains(candidates)
+        pts_in = candidates[inside]
+        if pts_in.shape[0] == 0:
+            raise ValueError(f"No points found inside mesh {mesh_file} with radius {radius} and spacing {spacing}")
+
+        volume_data = {"centers": pts_in.tolist(), "radii": [float(radius)] * len(pts_in)}
+        return self.add_particle_volume(volume_data, total_mass=total_mass, pos=pos, rot=rot)
+
+    def add_particle_volume(
+        self,
+        volume_data: str | dict[str, Any],
+        total_mass: float,
+        pos: Vec3 | None = None,
+        rot: Quat | None = None,
+        vel: Vec3 | None = None,
+    ) -> int:
+        """Adds particles that fill a volume defined by a union of spheres.
+
+        The spheres are specified either by a JSON file (e.g. a MorphIt output file) or a
+        dictionary with ``"centers"`` (a list of 3D points) and ``"radii"`` (a list of
+        matching radii). One particle is created per sphere, with per-particle mass derived
+        from ``total_mass`` in proportion to each sphere's volume. The particles are recorded
+        as a new entry in :attr:`particle_group` / :attr:`particle_groups`, which solvers such
+        as :class:`~newton.solvers.SolverSRXPBD` and :class:`~newton.solvers.SolverBXPBD` use
+        to treat the group as a single rigid body.
+
+        Args:
+            volume_data: Either a path to a JSON file, or a dictionary, with ``"centers"``
+                (list of ``[x, y, z]`` points) and ``"radii"`` (list of floats) keys.
+            total_mass: Total mass of the volume [kg]. Each particle's mass is this total
+                mass distributed in proportion to its sphere's volume.
+            pos: World-space offset applied to the volume. Defaults to ``(0, 0, 0)``.
+            rot: Rotation applied to the volume. Defaults to the identity rotation.
+            vel: Initial velocity assigned to every particle. Defaults to ``(0, 0, 0)``.
+
+        Returns:
+            The group id assigned to this volume's particles.
+
+        Raises:
+            ValueError: If the sphere data is empty, mismatched, or has zero total volume.
+        """
+        if isinstance(volume_data, str):
+            with open(volume_data) as f:
+                data = json.load(f)
+        else:
+            data = volume_data
+
+        centers = np.array(data["centers"], dtype=np.float32)
+        radii = np.array(data["radii"], dtype=np.float32)
+
+        if len(centers) != len(radii):
+            raise ValueError(f"Mismatch between number of centers ({len(centers)}) and radii ({len(radii)})")
+        if len(centers) == 0:
+            raise ValueError("volume_data must contain at least one sphere")
+
+        volumes = (4.0 / 3.0) * np.pi * (radii**3)
+        total_volume = np.sum(volumes)
+        if total_volume <= 0:
+            raise ValueError("Total volume of all spheres cannot be 0")
+
+        pos = wp.vec3(0.0, 0.0, 0.0) if pos is None else wp.vec3(*pos)
+        rot = wp.quat_identity(float) if rot is None else rot
+        vel = wp.vec3(0.0, 0.0, 0.0) if vel is None else wp.vec3(*vel)
+
+        group_id = self.particle_group_count
+        self.particle_group_count += 1
+        particle_start_idx = len(self.particle_q)
+
+        for point, radius in zip(centers, radii, strict=True):
+            particle_volume = 4.0 / 3.0 * np.pi * (radius**3)
+            mass = total_mass * (particle_volume / total_volume)
+            point_world = wp.quat_rotate(rot, wp.vec3(*point)) + pos
+            self.add_particle(point_world, vel, mass, radius)
+            # add_particle() initializes the group as ungrouped; assign it here instead.
+            self.particle_group[-1] = group_id
+
+        particle_end_idx = len(self.particle_q)
+        self.particle_groups[group_id] = list(range(particle_start_idx, particle_end_idx))
+
+        return group_id
 
     def add_particle_grid(
         self,
@@ -12955,6 +13128,8 @@ class ModelBuilder:
             )
             m.particle_flags = wp.array(particle_flags, dtype=wp.int32)
             m.particle_world = wp.array(self.particle_world, dtype=wp.int32)
+            m.particle_group = wp.array(self.particle_group, dtype=wp.int32)
+            m.particle_group_count = self.particle_group_count
             m.particle_max_radius = np.max(self.particle_radius) if len(self.particle_radius) > 0 else 0.0
             m.particle_max_velocity = self.particle_max_velocity
 

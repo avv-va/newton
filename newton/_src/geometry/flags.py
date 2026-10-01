@@ -22,6 +22,14 @@ class ParticleFlags(IntEnum):
         change without prior notice.
     """
 
+    INTEGRATE_ONLY = 1 << 2
+    """Indicates that the particle is integrated but excluded from contact handling.
+
+    Used for particles driven kinematically by the scene rather than by the solver's
+    own constraint resolution; see :class:`~newton.solvers.SolverSRXPBD` and
+    :class:`~newton.solvers.SolverBXPBD`.
+    """
+
 
 # Shape flags
 class ShapeFlags(IntEnum):
