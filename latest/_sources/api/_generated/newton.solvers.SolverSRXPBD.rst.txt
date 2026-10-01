@@ -1,0 +1,8 @@
+﻿newton.solvers.SolverSRXPBD
+===========================
+
+.. autoclass:: newton.solvers.SolverSRXPBD
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :member-order: groupwise

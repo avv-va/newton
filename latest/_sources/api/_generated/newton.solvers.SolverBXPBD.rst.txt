@@ -1,0 +1,8 @@
+﻿newton.solvers.SolverBXPBD
+==========================
+
+.. autoclass:: newton.solvers.SolverBXPBD
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :member-order: groupwise
